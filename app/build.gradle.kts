@@ -6,7 +6,7 @@ plugins {
 android {
     namespace = "com.example.vk_homework_2"
     compileSdk = 35
-
+    android.buildFeatures.buildConfig = true
     defaultConfig {
         applicationId = "com.example.vk_homework_2"
         minSdk = 24
@@ -27,7 +27,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            buildConfigField("String", "API", "\"https://api.giphy.com/v1/gifs/\"")
         }
+        debug {  buildConfigField("String", "API", "\"https://api.giphy.com/v1/gifs/\"")}
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8

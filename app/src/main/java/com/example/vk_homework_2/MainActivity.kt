@@ -1,5 +1,6 @@
 package com.example.vk_homework_2
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -40,8 +41,6 @@ import coil.request.ImageRequest
 
 
 
-const val API = "https://api.giphy.com/v1/gifs/"
-
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -54,9 +53,30 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-sealed class GifState {
-    data class Loaded(val url: String) : GifState()
-    data class Failed(val id: String = UUID.randomUUID().toString()) : GifState()
+@Composable
+fun OneImageView(item: GifState?, context: Context) {
+    if (item is GifState.Loaded) {
+        val painter = rememberAsyncImagePainter(
+            model = ImageRequest.Builder(context)
+                .data(item.url)
+                .crossfade(true)
+                .build()
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(250.dp)
+                .background(color = Color.White)
+                .padding(4.dp),
+        ) {
+            Image(
+                painter = painter,
+                contentDescription = "Random GIF",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+        }
+    }
 }
 
 @Composable
@@ -108,8 +128,10 @@ fun ErrorPlaceholder(onClick: () -> Unit) {
 
 @Composable
 fun GiphyApp() {
+    var scene by rememberSaveable { mutableStateOf(false) }
     var items by rememberSaveable { mutableStateOf<List<GifState>>(emptyList()) }
     var isLoading by rememberSaveable { mutableStateOf(false) }
+    var saveItem by rememberSaveable { mutableStateOf<GifState?>(null)}
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
@@ -117,7 +139,7 @@ fun GiphyApp() {
         scope.launch {
             isLoading = true
             try {
-                val gifUrl = RetrofitController(API)
+                val gifUrl = RetrofitController(BuildConfig.API)
                     .fetchGifFromApi()
                 items = listOf(GifState.Loaded(gifUrl)) + items
             } catch (e: Exception) {
@@ -130,7 +152,7 @@ fun GiphyApp() {
     fun retryLoadingGif(failedItem: GifState.Failed) {
         scope.launch {
             try {
-                val gifUrl = RetrofitController(API)
+                val gifUrl = RetrofitController(BuildConfig.API)
                     .fetchGifFromApi()
                 items = items.map {
                     if (it is GifState.Failed && it.id == failedItem.id) {
@@ -162,45 +184,54 @@ fun GiphyApp() {
         if (isLoading) {
             CircularProgressIndicator()
         }
+        if (scene) {
+            OneImageView(item = saveItem, context)
+        } else {
+            LazyVerticalGrid(
+                columns = if (isLandscape) GridCells.Fixed(2) else GridCells.Fixed(1),
+                contentPadding = PaddingValues(8.dp),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                items(items) { item ->
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(250.dp)
+                            .background(color = Color.White)
+                            .clickable(onClick = { scene = true; saveItem = item })
+                            .padding(4.dp),
+                        contentAlignment = Alignment.Center
 
-        LazyVerticalGrid(
-            columns = if (isLandscape) GridCells.Fixed(2) else GridCells.Fixed(1),
-            contentPadding = PaddingValues(8.dp),
-            modifier = Modifier.fillMaxSize()
-        ) {
-            items(items) { item ->
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(250.dp)
-                        .padding(4.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    when (item) {
-                        is GifState.Loaded -> {
-                            val painter = rememberAsyncImagePainter(
-                                model = ImageRequest.Builder(context)
-                                    .data(item.url)
-                                    .crossfade(true)
-                                    .build()
-                            )
 
-                            Image(
-                                painter = painter,
-                                contentDescription = "Random GIF",
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop
-                            )
+                    ) {
+                        when (item) {
+                            is GifState.Loaded -> {
+                                val painter = rememberAsyncImagePainter(
+                                    model = ImageRequest.Builder(context)
+                                        .data(item.url)
+                                        .crossfade(true)
+                                        .build()
+                                )
 
-                            when (painter.state) {
-                                is AsyncImagePainter.State.Loading -> {
-                                    CircularProgressIndicator()
+                                Image(
+                                    painter = painter,
+                                    contentDescription = "Random GIF",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+
+                                when (painter.state) {
+                                    is AsyncImagePainter.State.Loading -> {
+                                        CircularProgressIndicator()
+                                    }
+
+                                    else -> {}
                                 }
-                                else -> {}
                             }
-                        }
-                        is GifState.Failed -> {
-                            ErrorPlaceholder(onClick = { retryLoadingGif(item) })
+
+                            is GifState.Failed -> {
+                                ErrorPlaceholder(onClick = { retryLoadingGif(item) })
+                            }
                         }
                     }
                 }
